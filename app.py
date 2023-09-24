@@ -1,6 +1,6 @@
-from flask import Flask, render_template, url_for, redirect
+from flask import Flask, render_template, url_for, redirect, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
+from flask_login import UserMixin, LoginManager, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, ValidationError
@@ -11,6 +11,7 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SECRET_KEY'] = 'thisisasecretkey'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
 login_manager = LoginManager()
@@ -69,7 +70,12 @@ def login():
         if user:
             if bcrypt.check_password_hash(user.password, form.password.data):
                 login_user(user)
+                flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
+            else:
+                flash('Login failed. Check your username and password.', 'danger')
+        else:
+            flash('Login failed. Check your username and password.', 'danger')
     return render_template('login.html', form=form)
 
 
@@ -83,21 +89,28 @@ def dashboard():
 @login_required
 def logout():
     logout_user()
+    flash('Logged out successfully!', 'success')
     return redirect(url_for('login'))
 
 
-@ app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
-
     if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data)
+        hashed_password = bcrypt.generate_password_hash(
+            form.password.data).decode('utf-8')
         new_user = User(username=form.username.data, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
+        flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('login'))
-
     return render_template('register.html', form=form)
+
+
+@app.route('/monitor')
+@login_required
+def monitor():
+    return render_template('monitor.html')
 
 
 if __name__ == "__main__":
